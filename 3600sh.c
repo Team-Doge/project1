@@ -27,7 +27,7 @@ int main(int argc, char*argv[]) {
     
     // You should probably remove this; right now, it
     // just exits
-    do_exit();
+    // do_exit();
   }
 
   return 0;
