@@ -22,12 +22,14 @@ int main(int argc, char*argv[]) {
   // Main loop that reads a command and executes it
   while (1) {         
     // You should issue the prompt here
-      
+    printf("\n%s@%s:%s> ", getenv("USER"), getenv("HOST"), getenv("PWD"));
     // You should read in the command and execute it here
-    
+    char command;
+    scanf("%s", &command);
+    printf("You entered: %s", &command);
     // You should probably remove this; right now, it
     // just exits
-    // do_exit();
+     //do_exit();
   }
 
   return 0;
