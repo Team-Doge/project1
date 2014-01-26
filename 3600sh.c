@@ -22,14 +22,10 @@ int main(int argc, char*argv[]) {
   // Main loop that reads a command and executes it
   while (1) {         
     // You should issue the prompt here
-    printf("\n%s@%s:%s> ", getenv("USER"), getenv("HOST"), getenv("PWD"));
+    printf("%s@%s:%s> ", getenv("USER"), getenv("HOST"), getenv("PWD"));
     // You should read in the command and execute it here
-    char command;
-    scanf("%s", &command);
-    printf("You entered: %s", &command);
-    // You should probably remove this; right now, it
-    // just exits
-     //do_exit();
+    char* input;
+    input = get_input();
   }
 
   return 0;
@@ -40,4 +36,24 @@ int main(int argc, char*argv[]) {
 void do_exit() {
   printf("So long and thanks for all the fish!\n");
   exit(0);
+}
+
+char* get_input() {
+  char* input;
+  int chars_limit = 50;
+  input = (char *) calloc(chars_limit, sizeof(char));
+  int chars_read = 0;
+  char next;
+  next = getchar();
+  while (next != '\0' && next != EOF && next != '\n') {
+    if (chars_read == chars_limit) {
+      chars_limit += 50;
+      input = (char *) realloc(input, chars_limit);
+    }
+    input[chars_read] = next;
+    next = getchar();
+    chars_read++;
+  }
+
+  return input;
 }

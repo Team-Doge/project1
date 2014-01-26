@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+char* get_input();
 void do_exit();
 
 #endif 
