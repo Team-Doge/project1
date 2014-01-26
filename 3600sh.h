@@ -24,6 +24,7 @@
 #include <fcntl.h>
 
 char* get_input();
+int execute_cmd(char*);
 void do_exit();
 
 #endif 

@@ -26,6 +26,10 @@ int main(int argc, char*argv[]) {
     // You should read in the command and execute it here
     char* input;
     input = get_input();
+    int success = execute_cmd(input);
+    if (!success) {
+      printf(":(\n");
+    }
   }
 
   return 0;
@@ -56,4 +60,27 @@ char* get_input() {
   }
 
   return input;
+}
+
+int execute_cmd(char* cmd) {
+  pid_t pid  = fork();
+  if (pid < 0) { 
+    // Uh oh, an error
+    fprintf(stderr, "Fork Failed");
+    return 1;
+  }
+  else if (pid == 0) {
+    // Child process
+    cmd = cmd;
+    char* test[2];
+    test[0] = "/bin/ls";
+    test[1] = (char *)0;
+    int success = execvp("/bin/ls", test); 
+    printf("Failed to exec with code %d\n", success);
+  }
+  else {
+    // Wait for our children
+    wait (NULL);
+  }
+  return 0;
 }
