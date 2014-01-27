@@ -21,7 +21,7 @@ int main(int argc, char*argv[]) {
 
     // There's a script to run if the shell is executed with an argument
     if (argc > 1) {
-      freopen(argv[1], "r", stdin);
+        freopen(argv[1], "r", stdin);
     }
 
     int is_eof = 0;
@@ -35,7 +35,7 @@ int main(int argc, char*argv[]) {
         // gethostname() needs buffer, deal with later
         // Only print the prompt if the shell is run without a script
         if (argc == 1) {
-          printf("%s@%s:%s> ", getenv("USER"), hostname, getenv("PWD"));
+            printf("%s@%s:%s> ", getenv("USER"), hostname, getenv("PWD"));
         }
         // You should read in the command and execute it here
         char* input;
@@ -43,11 +43,11 @@ int main(int argc, char*argv[]) {
         int arg_count = count_args(input);
         char* args[arg_count+1];
         get_args(input, args);
-//        for(int i = 0; i < arg_count; i++) {
-//            printf("arg_count[%d] = %s\n", i, args[i]);
-//        }
+        //        for(int i = 0; i < arg_count; i++) {
+        //            printf("arg_count[%d] = %s\n", i, args[i]);
+        //        }
 
-        int success = execute_cmd(args);
+        int success = execute_cmd(arg_count, args);
         free(input);
         if (success != 0) {
             printf("An error occured: Exit code %d\n", success);
@@ -78,7 +78,7 @@ char* get_input(int* is_eof) {
     next = getchar();
     while (1) {
         if (next == EOF) {
-          *is_eof = 1;
+            *is_eof = 1;
         }
         if (next == '\n' || next == EOF) {
             next = '\0';
@@ -102,26 +102,66 @@ char* get_input(int* is_eof) {
     return input;
 }
 
-int execute_cmd(char** argv) {
+int execute_cmd(int argc, char** argv) {
     if (argv[0] && strcmp(argv[0], "exit") == 0) {
-      do_exit();
+        do_exit();
     }
+
     pid_t pid  = fork();
+
     if (pid < 0) {
         // Uh oh, an error
         fprintf(stderr, "Fork Failed");
         return 1;
     }
-    else if (pid == 0) {
-        // Child process
+    else if (pid == 0) { // Child process
+
+        // Checking for stdin/stdout redirection
+        for (int i = 0; i < argc; i++) {
+            char* arg = argv[i];
+            char* redirect_filename;
+            if (arg[0] ==  '>' || arg[0] == '<' || (arg[0] == '2' && arg[1] == '>')) {
+                if (strlen(arg) > 1 + (arg[0] == '2')) {
+                   redirect_filename = arg + 1 + (arg[0] == '2');
+                   if (i == 0) {
+                    argv++;
+                    i--;
+                   } else {
+                       argv[i] = NULL;
+                   }
+                } else if (argv[i+1] != NULL) {
+                    redirect_filename = argv[i+1];
+                    if (i == 0) {
+                        argv += 2;
+                        argc -= 2;
+                        i--;
+                    } else {
+                        argv[i] = NULL;
+                    }
+                } else {
+                    printf("Syntax error: expected file name after '%c'.\n", arg[0]);
+                    exit(-2);
+                }
+        //        printf("redirect %s\n", arg);
+          //      printf("filename %s\n", redirect_filename);
+                if (arg[0] == '>') {
+                    freopen(redirect_filename, "w", stdout);
+                } else if (arg[0] == '2') {
+                    freopen(redirect_filename, "w", stderr);
+                } else {
+                    freopen(redirect_filename, "r", stdin);
+                }
+            }
+        }
+
         execvp(argv[0], argv);
-        
+
         if (errno == ENOENT) {
             printf("Error: Command not found.\n");
         } else if (errno == EACCES) {
             printf("Error: Permission denied.\n");
         } else {
-          printf("Error: Exit code %d\n", errno);
+            printf("Error: Exit code %d\n", errno);
         }
         exit(-1);
     }
@@ -189,7 +229,7 @@ void get_args(char* cmd, char** argv) {
         } else {
             if (last_char_was_space) {
                 argv[argc] = cmd + i;
-//                printf("Remaining string is: %s\n", cmd + i);
+                //                printf("Remaining string is: %s\n", cmd + i);
                 argc++;
             }
             last_char_was_space = 0;

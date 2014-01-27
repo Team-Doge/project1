@@ -26,7 +26,7 @@
 char* get_input(int*);
 int count_args(char*);
 void get_args(char*, char**);
-int execute_cmd(char**);
+int execute_cmd(int, char**);
 void do_exit();
 
 #endif 
