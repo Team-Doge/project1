@@ -24,7 +24,9 @@
 #include <fcntl.h>
 
 char* get_input();
-int execute_cmd(char*);
+int count_args(char*);
+void get_args(char*, char**);
+int execute_cmd(char**);
 void do_exit();
 
 #endif 
