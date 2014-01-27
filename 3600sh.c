@@ -27,8 +27,8 @@ int main(int argc, char*argv[]) {
     char* input;
     input = get_input();
     int success = execute_cmd(input);
-    if (!success) {
-      printf(":(\n");
+    if (success != 0) {
+      printf("An error occured: Exit code %d\n", success);
     }
   }
 
@@ -75,12 +75,11 @@ int execute_cmd(char* cmd) {
     char* test[2];
     test[0] = "/bin/ls";
     test[1] = (char *)0;
-    int success = execvp("/bin/ls", test); 
-    printf("Failed to exec with code %d\n", success);
+    exit(execvp("/bin/ls", test)); 
   }
   else {
-    // Wait for our children
-    wait (NULL);
+    // Wait for the child 
+    waitpid(pid, NULL, 0);
   }
   return 0;
 }
