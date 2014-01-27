@@ -19,14 +19,27 @@ int main(int argc, char*argv[]) {
     USE(argv);
     setvbuf(stdout, NULL, _IONBF, 0);
 
+    // There's a script to run if the shell is executed with an argument
+    if (argc > 1) {
+      freopen(argv[1], "r", stdin);
+    }
+
+    int is_eof = 0;
+
+    char hostname[64];
+    gethostname(hostname, 64);
+
     // Main loop that reads a command and executes it
-    while (1) {
+    while (!is_eof) {
         // You should issue the prompt here
         // gethostname() needs buffer, deal with later
-        printf("%s@%s:%s> ", getenv("USER"), getenv("HOST"), getenv("PWD"));
+        // Only print the prompt if the shell is run without a script
+        if (argc == 1) {
+          printf("%s@%s:%s> ", getenv("USER"), hostname, getenv("PWD"));
+        }
         // You should read in the command and execute it here
         char* input;
-        input = get_input();
+        input = get_input(&is_eof);
         int arg_count = count_args(input);
         char* args[arg_count+1];
         get_args(input, args);
@@ -35,10 +48,12 @@ int main(int argc, char*argv[]) {
 //        }
 
         int success = execute_cmd(args);
+        free(input);
         if (success != 0) {
             printf("An error occured: Exit code %d\n", success);
         }
     }
+    do_exit();
 
     return 0;
 }
@@ -50,7 +65,7 @@ void do_exit() {
     exit(0);
 }
 
-char* get_input() {
+char* get_input(int* is_eof) {
     char* input;
     int chars_limit = 50;
     input = (char *) calloc(chars_limit, sizeof(char));
@@ -62,6 +77,9 @@ char* get_input() {
     char next;
     next = getchar();
     while (1) {
+        if (next == EOF) {
+          *is_eof = 1;
+        }
         if (next == '\n' || next == EOF) {
             next = '\0';
         }
@@ -85,6 +103,9 @@ char* get_input() {
 }
 
 int execute_cmd(char** argv) {
+    if (argv[0] && strcmp(argv[0], "exit") == 0) {
+      do_exit();
+    }
     pid_t pid  = fork();
     if (pid < 0) {
         // Uh oh, an error
@@ -93,8 +114,15 @@ int execute_cmd(char** argv) {
     }
     else if (pid == 0) {
         // Child process
-        int err = execvp(argv[0], argv);
-        printf("Error with code: %d\n", err);
+        execvp(argv[0], argv);
+        
+        if (errno == ENOENT) {
+            printf("Error: Command not found.\n");
+        } else if (errno == EACCES) {
+            printf("Error: Permission denied.\n");
+        } else {
+          printf("Error: Exit code %d\n", errno);
+        }
         exit(-1);
     }
     else {
@@ -108,8 +136,9 @@ int count_args(char* cmd) {
     int argc = 0;
     int last_char_was_space = 1;
     int last_char_was_backslash = 0;
+    unsigned int len = strlen(cmd);
     // Find out how many arguments there are in the command
-    for (unsigned int i = 0; i < strlen(cmd); i++) {
+    for (unsigned int i = 0; i < len; i++) {
         char c = cmd[i];
         if (last_char_was_backslash) {
             last_char_was_backslash = 0;
