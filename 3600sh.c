@@ -42,16 +42,19 @@ int main(int argc, char*argv[]) {
         input = get_input(&is_eof);
         int arg_count = count_args(input);
         char* args[arg_count+1];
-        get_args(input, args);
-        //        for(int i = 0; i < arg_count; i++) {
-        //            printf("arg_count[%d] = %s\n", i, args[i]);
-        //        }
-
-        int success = execute_cmd(arg_count, args);
-        free(input);
-        if (success != 0) {
-            printf("An error occured: Exit code %d\n", success);
+        int did_get_args = get_args(input, args);
+        if (did_get_args == 0) {
+            int success = execute_cmd(arg_count, args);
+            if (success != 0) {
+                printf("An error occured: Exit code %d\n", success);
+            }
         }
+        free(input);
+//        for(int i = 0; i < arg_count; i++) {
+//            printf("arg_count[%d] = %s\n", i, args[i]);
+//        }
+
+        
     }
     do_exit();
 
@@ -205,35 +208,130 @@ int count_args(char* cmd) {
     return argc;
 }
 
-void get_args(char* cmd, char** argv) {
+int get_args(char* cmd, char** argv) {
     int argc = 0;
-    int last_char_was_space = 1;
-    int last_char_was_backslash = 0;
+    //int last_char_was_space = 1;
+    //int last_char_was_backslash = 0;
     unsigned int len = strlen(cmd);
-    for (unsigned int i = 0; i < len; i++) {
-        char c = cmd[i];
-        if (last_char_was_backslash) {
-            last_char_was_backslash = 0;
-            continue;
-        } else if (c == '\\') {
-            last_char_was_backslash = 1;
-        }
 
-        if (c == ' ' || c == '\t') {
-            if (last_char_was_space) {
-                continue; 
-            } else {
-                last_char_was_space = 1;
-                cmd[i] = '\0';
+    char last_char = ' ';
+    int current_arg_max_size = 30;
+    int current_arg_len = 0;
+    char* current_arg = (char *) calloc(current_arg_max_size, sizeof(char));
+
+    unsigned int a;
+    for (a = 0; a < len; a++) {
+        char c = cmd[a];
+        //printf("Finding a space for %c\n", c);
+        if (last_char != '\\') {
+            switch(c) {
+                case '\\': 
+                    // Do nothing
+                    break;
+                case '2':
+                    if (cmd[a+1] == '>') {
+                        // Redirect stderr
+                        argv[argc] = "2>";
+                        argc++;
+                        a++;
+                        last_char = '>';
+                        continue;
+                    } else {
+                        cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, c);
+
+                        // We've reached the end of all args, add in what is in current_arg to argv
+                        if (a + 1 == len) {
+                            cpy_arg(current_arg, &argc, argv);
+                            current_arg_len = 0;
+                        }
+                    }
+                    break;
+                case ' ':
+                case '\t':
+                    if (last_char == ' ' || last_char == '\t' || last_char == '>' || last_char == '<') {
+                        break;
+                    }
+                    // We've reached the end of an arg, so we want to copy current_cmd into 
+                    // a new string, put that string in argv, and then reset current_cmd to be 
+                    // empty again so we can read in the next arg
+                    char* new_arg = (char *) calloc(current_arg_len + 1, sizeof(char));
+                    strcpy(new_arg, current_arg);
+                    free(current_arg);
+                    current_arg_len = 0;
+                    current_arg = (char *) calloc(30, sizeof(char));
+                    argv[argc] = new_arg;
+                    argc++;
+                    break;
+                case '>':
+                case '<':
+                    // We've reached a redirection change, so the current_cmd can be copied into
+                    // a new string, put that string in argv, and then reset current_cmd to be 
+                    // empty again so we can read in the next arg after the redirection only if there
+                    // is a whitespace before it. We shoud also put in the redirection as its own 
+                    // separate arg into argv
+                    if (last_char == ' ' || last_char == '\t') {
+                        char* new_arg = (char *) calloc(2, sizeof(char));
+                        strcpy(new_arg, &c);
+                        new_arg[1] = '\0';
+                        argv[argc] = new_arg;
+                        argc++;
+                        break;
+                    }
+                default:
+                    cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, c);
+
+                    // We've reached the end of all args, add in what is in current_arg to argv
+                    if (a + 1 == len) {
+                        cpy_arg(current_arg, &argc, argv);
+                        current_arg_len = 0;
+                    }
+                    break;
             }
         } else {
-            if (last_char_was_space) {
-                argv[argc] = cmd + i;
-                //                printf("Remaining string is: %s\n", cmd + i);
-                argc++;
+            switch(c) {
+                case 't':
+                    cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, '\t');
+                    break;
+                case '&':
+                case ' ':
+                case '\\':
+                    cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, c);
+                    break;
+                default:
+                    // UH OH. DAT BAD.
+                    printf("Error: Unrecognized escape sequence.");
+                    return -1;
             }
-            last_char_was_space = 0;
+            // We've reached the end of all args, add in what is in current_arg to argv
+            if (a + 1 == len) {
+                cpy_arg(current_arg, &argc, argv);
+                current_arg_len = 0;
+            }
+            last_char = ' ';
+            continue;
         }
+        last_char = c;
     }
-    argv[argc] = NULL;
+   argv[argc] = NULL;
+   return 0;
 }
+
+void cpy_arg_char(char* current_arg, int* current_arg_len, int* current_arg_max_size, char c) {
+    if (*current_arg_len == (*current_arg_max_size - 1)) {
+        *current_arg_max_size += 30;
+        current_arg = (char *) realloc(current_arg, *current_arg_max_size);
+    }
+    current_arg[*current_arg_len] = c;
+    *current_arg_len += 1;
+}
+
+void cpy_arg(char* current_arg, int* argc, char** argv) {
+    int current_arg_len = strlen(current_arg);
+    char* new_arg = (char *) calloc(current_arg_len + 1, sizeof(char));
+    strcpy(new_arg, current_arg);
+    free(current_arg);
+    current_arg = (char *) calloc(30, sizeof(char));
+    argv[*argc] = new_arg;
+    *argc += 1;
+}
+
