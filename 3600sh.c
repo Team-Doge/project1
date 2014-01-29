@@ -299,7 +299,7 @@ int get_args(char* cmd, char** argv) {
                     break;
                 default:
                     // UH OH. DAT BAD.
-                    printf("Error: Unrecognized escape sequence.");
+                    printf("Error: Unrecognized escape sequence.\n");
                     return -1;
             }
             // We've reached the end of all args, add in what is in current_arg to argv
