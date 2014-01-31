@@ -275,12 +275,8 @@ int get_args(char* cmd, char** argv) {
                     // We've reached the end of an arg, so we want to copy current_cmd into 
                     // a new string, put that string in argv, and then reset current_cmd to be 
                     // empty again so we can read in the next arg
-                    char* new_arg = (char *) calloc(current_arg_len + 1, sizeof(char));
-                    strcpy(new_arg, current_arg);
-                    free(current_arg);
+                    cpy_arg(current_arg, &argc, argv);
                     current_arg_len = 0;
-                    current_arg = (char *) calloc(30, sizeof(char));
-                    argv[argc] = new_arg;
                     argc++;
                     break;
                 case '>':
@@ -340,6 +336,7 @@ int get_args(char* cmd, char** argv) {
 void cpy_arg_char(char** current_arg, int* current_arg_len, int* current_arg_max_size, char c) {
     if (*current_arg_len == (*current_arg_max_size - 1)) {
         *current_arg_max_size += 30;
+        printf("current_arg_max_size: %d\n", *current_arg_max_size);
         *current_arg = (char *) realloc(*current_arg, *current_arg_max_size);
     }
     (*current_arg)[*current_arg_len] = c;
@@ -349,11 +346,21 @@ void cpy_arg_char(char** current_arg, int* current_arg_len, int* current_arg_max
 void cpy_arg(char* current_arg, int* argc, char** argv) {
     int current_arg_len = strlen(current_arg);
     char* new_arg = (char *) calloc(current_arg_len + 1, sizeof(char));
-    strcpy(new_arg, current_arg);
+    if ((long) new_arg < 0) {
+        perror("Couldn't allocate memory for copying arguments.");
+        do_exit();
+    }
+    if ((long) strncpy(new_arg, current_arg, current_arg_len + 1) < 0) {
+        printf("Couldn't allocate memory for copying arguments.");
+        do_exit();
+    }
     free(current_arg);
     current_arg = (char *) calloc(30, sizeof(char));
+    if ((long) current_arg < 0) {
+        perror("Couldn't allocate memory for copying arguments.");
+        do_exit();
+    }
     argv[*argc] = new_arg;
     *argc += 1;
 }
-
 
