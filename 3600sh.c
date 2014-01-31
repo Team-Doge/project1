@@ -50,9 +50,9 @@ int main(int argc, char*argv[]) {
             }
         }
         free(input);
-//        for(int i = 0; i < arg_count; i++) {
-//            printf("arg_count[%d] = %s\n", i, args[i]);
-//        }
+        for(int i = 0; i < arg_count; i++) {
+            printf("arg_count[%d] = %s\n", i, args[i]);
+        }
 
         
     }
@@ -148,11 +148,32 @@ int execute_cmd(int argc, char** argv) {
         //        printf("redirect %s\n", arg);
           //      printf("filename %s\n", redirect_filename);
                 if (arg[0] == '>') {
-                    freopen(redirect_filename, "w", stdout);
+
+                    int f = open(redirect_filename, O_WRONLY);
+
+                    //FILE* stdout_file;
+                    //stdout_file = freopen(redirect_filename, "w", stdout);
+                    //printf("stdout_file: %p\n", (void*) stdout_file);
+                    if (f < 0) {
+                        printf("Error: Unable to open redirection file.\n");
+                        exit(errno);
+                    }
+                    
+                    dup2(f, 1);
                 } else if (arg[0] == '2') {
-                    freopen(redirect_filename, "w", stderr);
+                    FILE* stderr_file;
+                    stderr_file = freopen(redirect_filename, "w", stderr);
+                    if (stderr_file == NULL) {
+                        printf("Error: Unable to open redirection file.\n");
+                        exit(errno);
+                    }
                 } else {
-                    freopen(redirect_filename, "r", stdin);
+                    FILE* stdin_file;
+                    stdin_file = freopen(redirect_filename, "r", stdin);
+                    if (stdin_file == NULL) {
+                        printf("Error: Unable to open redirection file.\n");
+                        exit(errno);
+                    }
                 }
             }
         }
@@ -237,7 +258,7 @@ int get_args(char* cmd, char** argv) {
                         last_char = '>';
                         continue;
                     } else {
-                        cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, c);
+                        cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, c);
 
                         // We've reached the end of all args, add in what is in current_arg to argv
                         if (a + 1 == len) {
@@ -278,7 +299,7 @@ int get_args(char* cmd, char** argv) {
                         break;
                     }
                 default:
-                    cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, c);
+                    cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, c);
 
                     // We've reached the end of all args, add in what is in current_arg to argv
                     if (a + 1 == len) {
@@ -290,12 +311,12 @@ int get_args(char* cmd, char** argv) {
         } else {
             switch(c) {
                 case 't':
-                    cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, '\t');
+                    cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, '\t');
                     break;
                 case '&':
                 case ' ':
                 case '\\':
-                    cpy_arg_char(current_arg, &current_arg_len, &current_arg_max_size, c);
+                    cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, c);
                     break;
                 default:
                     // UH OH. DAT BAD.
@@ -316,12 +337,12 @@ int get_args(char* cmd, char** argv) {
    return 0;
 }
 
-void cpy_arg_char(char* current_arg, int* current_arg_len, int* current_arg_max_size, char c) {
+void cpy_arg_char(char** current_arg, int* current_arg_len, int* current_arg_max_size, char c) {
     if (*current_arg_len == (*current_arg_max_size - 1)) {
         *current_arg_max_size += 30;
-        current_arg = (char *) realloc(current_arg, *current_arg_max_size);
+        *current_arg = (char *) realloc(*current_arg, *current_arg_max_size);
     }
-    current_arg[*current_arg_len] = c;
+    (*current_arg)[*current_arg_len] = c;
     *current_arg_len += 1;
 }
 
@@ -334,4 +355,5 @@ void cpy_arg(char* current_arg, int* argc, char** argv) {
     argv[*argc] = new_arg;
     *argc += 1;
 }
+
 

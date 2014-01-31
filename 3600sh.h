@@ -26,7 +26,7 @@
 char* get_input(int*);
 int count_args(char*);
 int get_args(char*, char**);
-void cpy_arg_char(char*, int*, int*, char);
+void cpy_arg_char(char**, int*, int*, char);
 void cpy_arg(char*, int*, char**);
 int execute_cmd(int, char**);
 void do_exit();
