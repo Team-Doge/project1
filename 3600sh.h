@@ -32,10 +32,10 @@ int execute_cmd(int, char**);
 void do_exit();
 
 
-char* get_arg(int*);
+char* get_arg(int*, int*);
 int is_white_space(char);
 void empty_input();
-char** get_my_args(int*, int*);
+char** get_my_args(int*, int*, int*);
 void mem_error();
 
 #endif 

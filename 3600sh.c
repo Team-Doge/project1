@@ -41,7 +41,7 @@ int main(int argc, char*argv[]) {
         char** my_argv;
         int count;
         int should_background = 0;
-        my_argv = get_my_args(&count, &should_background);
+        my_argv = get_my_args(&count, &should_background, &is_eof);
         if (my_argv == NULL) {
             continue;
         }
@@ -375,7 +375,7 @@ void cpy_arg(char** current_arg, int* argc, char** argv) {
 
 
 
-char* get_arg(int* status) {
+char* get_arg(int* status, int* is_eof) {
     char* buffer = (char*) calloc(10, 1);
     char c;
     char next;
@@ -412,6 +412,9 @@ char* get_arg(int* status) {
     while (c != EOF && !is_white_space(c) && do_loop) {
         if  (c == '\\') {
             next = getchar();
+            if (next == EOF) {
+                *is_eof = 1;
+            }
             // Handle escape cases
             if (next == 't') {
                 c = '\t';
@@ -446,6 +449,10 @@ char* get_arg(int* status) {
                 return NULL;
             }
 
+            if (c == EOF) {
+                *is_eof = 1;
+            }
+
             break;
         }
 
@@ -465,6 +472,10 @@ char* get_arg(int* status) {
     // Check to see if we've read in the full line
     if ((c == '\n' || c == EOF) && (*status != 2)) {
         *status= 1;
+    }
+
+    if (c == EOF) {
+        *is_eof = 1;
     }
 
     // Save the argument to memory
@@ -494,7 +505,7 @@ void empty_input() {
 
 
 
-char** get_my_args(int* count, int* should_background) {
+char** get_my_args(int* count, int* should_background, int* is_eof) {
     int argc = 0;
     int argv_sz = 10;
     int status = 0;
@@ -505,7 +516,7 @@ char** get_my_args(int* count, int* should_background) {
     }
     
     while (status == 0) {
-        arg = get_arg(&status);
+        arg = get_arg(&status, is_eof);
         if (arg == NULL) {
             free(argv);
             *count = 0;
