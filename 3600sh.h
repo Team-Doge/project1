@@ -24,13 +24,13 @@
 #include <fcntl.h>
 
 char* get_input(int*);
-int execute_cmd(int, char**);
+int execute_cmd(int, char**, int*);
 void do_exit();
 
 
 char* get_arg(int*, int*);
 int is_white_space(char);
-void empty_input();
+void empty_input(int*);
 char** get_my_args(int*, int*, int*);
 void mem_error();
 int is_redirection(char*);

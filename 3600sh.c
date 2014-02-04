@@ -1,5 +1,4 @@
-/**
- * CS3600, Spring 2013
+/** * CS3600, Spring 2013
  * Project 1 Starter Code
  * (c) 2013 Alan Mislove
  *
@@ -53,7 +52,7 @@ int main(int argc, char*argv[]) {
 //            printf("Got arg %d: '%s'\n", i, my_argv[i]);
         }
 
-        execute_cmd(count, my_argv);
+        execute_cmd(count, my_argv, &should_background);
     }
     do_exit();
 
@@ -64,10 +63,11 @@ int main(int argc, char*argv[]) {
 //
 void do_exit() {
     printf("So long and thanks for all the fish!\n");
+    wait(NULL);
     exit(0);
 }
 
-int execute_cmd(int argc, char** argv) {
+int execute_cmd(int argc, char** argv, int* should_background) {
     if (argv[0] && strcmp(argv[0], "exit") == 0) {
         do_exit();
     }
@@ -82,43 +82,48 @@ int execute_cmd(int argc, char** argv) {
         char* stdin_fname = NULL;
         char* stdout_fname = NULL;
         char* stderr_fname = NULL;
+        int bad_syntax = 0;
 
         // Checking for stdin/stdout redirection
         for (int i = 0; i < argc; i++) {
             char* arg = argv[i];
+            //printf("Checking redirection for: '%s'\n", arg);
+            // redirection check
+            if (is_redirection(arg)) {
+                char* next_arg = argv[i+1];
+                //printf("Redirection: '%s' followed by '%s'\n", arg, next_arg);
+                if (next_arg == NULL || is_redirection(next_arg) || strcmp(next_arg, "&") == 0) {
+                    bad_syntax = 1;
+                    break;
+                }
+                
+                if ((i + 2) < argc) {
+                    char* next_next_arg = argv[i+2];
+                    if (next_next_arg != NULL) {
+                        // printf("next_next_arg: '%s'\n", next_next_arg);
+                        if (!is_redirection(next_next_arg) && strcmp(next_next_arg, "&") != 0) {
+                            bad_syntax = 1;
+                            break;
+                        }
+                    }
+                }
 
-            // stdout redirection check
-            if (strcmp(arg, ">") == 0) {
-                if ((i + 1) < argc) {
+                if (strcmp(arg, ">") == 0) {
+              //      printf("Redirecting stdout to: '%s'\n", argv[i+1]);
                     stdout_fname = argv[i+1];
-                    argv[i] = NULL;
-                } else {
-                    printf("Error: Syntax error.\n");
-                    exit(3);
-                }
-            }
-
-            // stdin redirection check
-            if (strcmp(arg, "<") == 0) {
-                if ((i + 1) < argc) {
+                } else if (strcmp(arg, "<") == 0) {
                     stdin_fname = argv[i+1];
-                    argv[i] = NULL;
-                } else {
-                    printf("Error: Syntax error.\n");
-                    exit(3);
-                }
-            }
-
-            // stderr redirection check
-            if (strcmp(arg, "2>") == 0) {
-                if ((i + 1) < argc) {
+                } else if (strcmp(arg, "2>") == 0) {
                     stderr_fname = argv[i+1];
-                    argv[i] = NULL;
-                } else {
-                    printf("Error: Syntax error.\n");
-                    exit(3);
                 }
+
+                argv[i] = NULL;
             }
+        }
+
+        if (bad_syntax == 1) {
+            printf("Error: Invalid syntax.\n");
+            exit(3);
         }
 
         // Redirect stdout
@@ -126,22 +131,14 @@ int execute_cmd(int argc, char** argv) {
             if (!is_redirection(stdout_fname)
                     && !(strcmp(stdout_fname, "&") == 0)) {
 
- //               int f = open(stdout_fname, O_WRONLY);
                 FILE* stdout_file;
                 stdout_file= freopen(stdout_fname, "w", stdout);
                 if (stdout_file == NULL) {
                     printf("Error: Unable to open redirection file.\n");
                     exit(errno);
                 }
-/*                if (f < 0) {
-                    printf("Error: Unable to open redirection file.\n");
-                    printf("Errno: %d\n", errno);
-                    exit(errno);
-                }
-*/
-    //            dup2(f, 1);
             } else {
-                printf("Error: Syntax error.\n");
+                printf("Error: Invalid syntax.\n");
                 exit(3);
             }
         }
@@ -159,7 +156,7 @@ int execute_cmd(int argc, char** argv) {
                     exit(errno);
                 }
             } else {
-                printf("Error: Syntax error.\n");
+                printf("Error: Invalid syntax.\n");
                 exit(3);
             }
         }
@@ -176,7 +173,7 @@ int execute_cmd(int argc, char** argv) {
                     exit(errno);
                 }
             } else {
-                printf("Error: Syntax error.\n");
+                printf("Error: Invalid syntax.\n");
                 exit(3);
             }
         }
@@ -191,11 +188,13 @@ int execute_cmd(int argc, char** argv) {
             printf("Error: Exit code %d\n", errno);
         }
         exit(-1);
+    } else {
+        if (*should_background == 0) {
+            // Wait for the child
+            waitpid(pid, NULL, 0);
+        }
     }
-    else {
-        // Wait for the child
-        waitpid(pid, NULL, 0);
-    }
+
     return 0;
 }
 
@@ -259,7 +258,7 @@ char* get_arg(int* status, int* is_eof) {
                 if (next == '\n') {
                     *status = 1;
                 } else {
-                    empty_input();
+                    empty_input(is_eof);
                 }
                 free(buffer);
                 return NULL;
@@ -274,7 +273,7 @@ char* get_arg(int* status, int* is_eof) {
 
             if (c != '\n' && c != EOF) {
                 printf("Error: Invalid syntax.\n");
-                empty_input();
+                empty_input(is_eof);
                 free(buffer);
                 return NULL;
             }
@@ -324,11 +323,14 @@ int is_white_space(char c) {
 }
 
 
-void empty_input() {
+void empty_input(int* is_eof) {
     char c;
     c = getchar();
     while (c != '\n' && c != EOF) {
         c = getchar();
+    }
+    if (c == EOF) {
+        *is_eof = 1;
     }
 }
 
