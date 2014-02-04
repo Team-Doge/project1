@@ -33,5 +33,6 @@ int is_white_space(char);
 void empty_input();
 char** get_my_args(int*, int*, int*);
 void mem_error();
+int is_redirection(char*);
 
 #endif 

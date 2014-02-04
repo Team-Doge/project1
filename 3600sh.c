@@ -50,7 +50,7 @@ int main(int argc, char*argv[]) {
            // printf("Will background the process.\n");
         }
         for (int i = 0; i < count; i++) {
-            //printf("Got arg %d: '%s'\n", i, my_argv[i]);
+//            printf("Got arg %d: '%s'\n", i, my_argv[i]);
         }
 
         execute_cmd(count, my_argv);
@@ -78,65 +78,106 @@ int execute_cmd(int argc, char** argv) {
         // Uh oh, an error
         fprintf(stderr, "Fork Failed");
         return 1;
-    }
-    else if (pid == 0) { // Child process
+    } else if (pid == 0) { // Child process
+        char* stdin_fname = NULL;
+        char* stdout_fname = NULL;
+        char* stderr_fname = NULL;
 
         // Checking for stdin/stdout redirection
         for (int i = 0; i < argc; i++) {
             char* arg = argv[i];
-            char* redirect_filename;
-            if (arg[0] ==  '>' || arg[0] == '<' || (arg[0] == '2' && arg[1] == '>')) {
-                if (strlen(arg) > 1 + (arg[0] == '2')) {
-                   redirect_filename = arg + 1 + (arg[0] == '2');
-                   if (i == 0) {
-                    argv++;
-                    i--;
-                   } else {
-                       argv[i] = NULL;
-                   }
-                } else if (argv[i+1] != NULL) {
-                    redirect_filename = argv[i+1];
-                    if (i == 0) {
-                        argv += 2;
-                        argc -= 2;
-                        i--;
-                    } else {
-                        argv[i] = NULL;
-                    }
-                } else {
-                    printf("Syntax error: expected file name after '%c'.\n", arg[0]);
-                    exit(-2);
-                }
-        //        printf("redirect %s\n", arg);
-          //      printf("filename %s\n", redirect_filename);
-                if (arg[0] == '>') {
 
-                    int f = open(redirect_filename, O_WRONLY);
-
-                    //FILE* stdout_file;
-                    //stdout_file = freopen(redirect_filename, "w", stdout);
-                    //printf("stdout_file: %p\n", (void*) stdout_file);
-                    if (f < 0) {
-                        printf("Error: Unable to open redirection file.\n");
-                        exit(errno);
-                    }
-                    
-                    dup2(f, 1);
-                } else if (arg[0] == '2') {
-                    FILE* stderr_file;
-                    stderr_file = freopen(redirect_filename, "w", stderr);
-                    if (stderr_file == NULL) {
-                        printf("Error: Unable to open redirection file.\n");
-                        exit(errno);
-                    }
+            // stdout redirection check
+            if (strcmp(arg, ">") == 0) {
+                if ((i + 1) < argc) {
+                    stdout_fname = argv[i+1];
+                    argv[i] = NULL;
                 } else {
-                    FILE* stdin_file;
-                    stdin_file = freopen(redirect_filename, "r", stdin);
-                    if (stdin_file == NULL) {
-                        printf("Error: Unable to open redirection file.\n");
-                        exit(errno);
-                    }
+                    printf("Error: Syntax error.\n");
+                    exit(3);
                 }
+            }
+
+            // stdin redirection check
+            if (strcmp(arg, "<") == 0) {
+                if ((i + 1) < argc) {
+                    stdin_fname = argv[i+1];
+                    argv[i] = NULL;
+                } else {
+                    printf("Error: Syntax error.\n");
+                    exit(3);
+                }
+            }
+
+            // stderr redirection check
+            if (strcmp(arg, "2>") == 0) {
+                if ((i + 1) < argc) {
+                    stderr_fname = argv[i+1];
+                    argv[i] = NULL;
+                } else {
+                    printf("Error: Syntax error.\n");
+                    exit(3);
+                }
+            }
+        }
+
+        // Redirect stdout
+        if (stdout_fname != NULL) {
+            if (!is_redirection(stdout_fname)
+                    && !(strcmp(stdout_fname, "&") == 0)) {
+
+ //               int f = open(stdout_fname, O_WRONLY);
+                FILE* stdout_file;
+                stdout_file= freopen(stdout_fname, "w", stdout);
+                if (stdout_file == NULL) {
+                    printf("Error: Unable to open redirection file.\n");
+                    exit(errno);
+                }
+/*                if (f < 0) {
+                    printf("Error: Unable to open redirection file.\n");
+                    printf("Errno: %d\n", errno);
+                    exit(errno);
+                }
+*/
+    //            dup2(f, 1);
+            } else {
+                printf("Error: Syntax error.\n");
+                exit(3);
+            }
+        }
+
+        // stdin redirection
+        if (stdin_fname != NULL) {
+            if (!is_redirection(stdin_fname)
+                    && !(strcmp(stdin_fname, "&") == 0)) {
+
+                FILE* stdin_file;
+                stdin_file = freopen(stdin_fname, "r", stdin);
+
+                if (stdin_file == NULL) {
+                    printf("Error: Unable to open redirection file.\n");
+                    exit(errno);
+                }
+            } else {
+                printf("Error: Syntax error.\n");
+                exit(3);
+            }
+        }
+
+        // stderr redirection
+        if (stderr_fname != NULL) {
+            if (!is_redirection(stderr_fname)
+                    && !(strcmp(stderr_fname, "&") == 0)) {
+
+                FILE* stderr_file;
+                stderr_file = freopen(stderr_fname, "w", stderr);
+                if (stderr_file == NULL) {
+                    printf("Error: Unable to open redirection file.\n");
+                    exit(errno);
+                }
+            } else {
+                printf("Error: Syntax error.\n");
+                exit(3);
             }
         }
 
@@ -156,6 +197,12 @@ int execute_cmd(int argc, char** argv) {
         waitpid(pid, NULL, 0);
     }
     return 0;
+}
+
+int is_redirection(char* arg) {
+    return strcmp(arg, ">") == 0
+            || strcmp(arg, "<") == 0
+            || strcmp(arg, "2>") == 0;
 }
 
 char* get_arg(int* status, int* is_eof) {
@@ -293,6 +340,9 @@ char** get_my_args(int* count, int* should_background, int* is_eof) {
     int argc = 0;
     int argv_sz = 10;
     int status = 0;
+    int redirect_stdin = 0;
+    int redirect_stdout = 0;
+    int redirect_stderr = 0;
     char* arg;
     char** argv = (char**) calloc(argv_sz, sizeof(char*));
     if (argv == NULL) {
@@ -318,6 +368,15 @@ char** get_my_args(int* count, int* should_background, int* is_eof) {
                 mem_error();
             }
         }
+
+        if (*arg == '>') {
+            redirect_stdout++;
+        } else if (*arg == '<') {
+            redirect_stdin++;
+        } else if (strcmp(arg, "2>") == 0) {
+            redirect_stderr++;
+        }
+
         argv[argc] = arg;
         argc++;
 
@@ -331,6 +390,13 @@ char** get_my_args(int* count, int* should_background, int* is_eof) {
 
     for (int i = 0; i < argc; i++) {
         ret[i] = argv[i];
+    }
+
+    if (redirect_stdin > 1 || redirect_stdout > 1 || redirect_stderr > 1) {
+        printf("Error: Invalid syntax.\n");
+        free(argv);
+        *count = 0;
+        return NULL;
     }
 
     ret[argc] = NULL;
