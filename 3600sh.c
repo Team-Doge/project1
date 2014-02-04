@@ -67,43 +67,6 @@ void do_exit() {
     exit(0);
 }
 
-char* get_input(int* is_eof) {
-    char* input;
-    int chars_limit = 50;
-    input = (char *) calloc(chars_limit, sizeof(char));
-    if (input == NULL) {
-        // Memory error
-        exit(1);
-    }
-    int chars_read = 0;
-    char next;
-    next = getchar();
-    while (1) {
-        if (next == EOF) {
-            *is_eof = 1;
-        }
-        if (next == '\n' || next == EOF) {
-            next = '\0';
-        }
-        if (chars_read == chars_limit) {
-            chars_limit += 50;
-            input = (char *) realloc(input, chars_limit);
-            if (input == NULL) {
-                // Memory error
-                exit(1);
-            }
-        }
-        input[chars_read] = next;
-        if (next == '\0') {
-            break;
-        }
-        next = getchar();
-        chars_read++;
-    }
-
-    return input;
-}
-
 int execute_cmd(int argc, char** argv) {
     if (argv[0] && strcmp(argv[0], "exit") == 0) {
         do_exit();
@@ -195,186 +158,6 @@ int execute_cmd(int argc, char** argv) {
     return 0;
 }
 
-int count_args(char* cmd) {
-    int argc = 0;
-    int last_char_was_space = 1;
-    int last_char_was_backslash = 0;
-    unsigned int len = strlen(cmd);
-    // Find out how many arguments there are in the command
-    for (unsigned int i = 0; i < len; i++) {
-        char c = cmd[i];
-        if (last_char_was_backslash) {
-            last_char_was_backslash = 0;
-            continue;
-        } else if (c == '\\') {
-            last_char_was_backslash = 1;
-        }
-
-        if (c == ' ' || c == '\t') {
-            if (last_char_was_space) {
-                continue; 
-            } else {
-                last_char_was_space = 1;
-            }
-        } else {
-            if (last_char_was_space) {
-                argc++;
-            }
-            last_char_was_space = 0;
-        }
-    }
-    // If last character was backslash, then it's a syntax error
-    // because we don't support multiple-line commands
-    return argc;
-}
-
-int get_args(char* cmd, char** argv) {
-    int argc = 0;
-    //int last_char_was_space = 1;
-    //int last_char_was_backslash = 0;
-    unsigned int len = strlen(cmd);
-
-    char last_char = ' ';
-    int current_arg_max_size = 30;
-    int current_arg_len = 0;
-    char* current_arg = (char *) calloc(current_arg_max_size, sizeof(char));
-
-    unsigned int a;
-    for (a = 0; a < len; a++) {
-        char c = cmd[a];
-        //printf("Finding a space for %c\n", c);
-        if (last_char != '\\') {
-            switch(c) {
-                case '\\': 
-                    // Do nothing
-                    break;
-                case '2':
-                    if (cmd[a+1] == '>') {
-                        // Redirect stderr
-                        argv[argc] = "2>";
-                        argc++;
-                        a++;
-                        last_char = '>';
-                        continue;
-                    } else {
-                        cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, c);
-
-                        // We've reached the end of all args, add in what is in current_arg to argv
-                        if (a + 1 == len) {
-                            cpy_arg(&current_arg, &argc, argv);
-                            current_arg_len = 0;
-                        }
-                    }
-                    break;
-                case ' ':
-                case '\t':
-                    if (last_char == ' ' || last_char == '\t' || last_char == '>' || last_char == '<') {
-                        break;
-                    }
-                    // We've reached the end of an arg, so we want to copy current_cmd into 
-                    // a new string, put that string in argv, and then reset current_cmd to be 
-                    // empty again so we can read in the next arg
-                    cpy_arg(&current_arg, &argc, argv);
-                    current_arg_len = 0;
-                    //argc++;
-                    break;
-                case '>':
-                case '<':
-                    // We've reached a redirection change, so the current_cmd can be copied into
-                    // a new string, put that string in argv, and then reset current_cmd to be 
-                    // empty again so we can read in the next arg after the redirection only if there
-                    // is a whitespace before it. We shoud also put in the redirection as its own 
-                    // separate arg into argv
-                    if (last_char == ' ' || last_char == '\t') {
-                        char* new_arg = (char *) calloc(2, sizeof(char));
-                        strcpy(new_arg, &c);
-                        new_arg[1] = '\0';
-                        argv[argc] = new_arg;
-                        argc++;
-                        break;
-                    }
-                default:
-                    cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, c);
-
-                    // We've reached the end of all args, add in what is in current_arg to argv
-                    if (a + 1 == len) {
-                        cpy_arg(&current_arg, &argc, argv);
-                        current_arg_len = 0;
-                    }
-                    break;
-            }
-        } else {
-            switch(c) {
-                case 't':
-                    cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, '\t');
-                    break;
-                case '&':
-                case ' ':
-                case '\\':
-                    cpy_arg_char(&current_arg, &current_arg_len, &current_arg_max_size, c);
-                    break;
-                default:
-                    // UH OH. DAT BAD.
-                    printf("Error: Unrecognized escape sequence.\n");
-                    return -1;
-            }
-            // We've reached the end of all args, add in what is in current_arg to argv
-            if (a + 1 == len) {
-                cpy_arg(&current_arg, &argc, argv);
-                current_arg_len = 0;
-            }
-            last_char = ' ';
-            continue;
-        }
-        last_char = c;
-    }
-   argv[argc] = NULL;
-   return 0;
-}
-
-void cpy_arg_char(char** current_arg, int* current_arg_len, int* current_arg_max_size, char c) {
-    if (*current_arg_len == (*current_arg_max_size - 1)) {
-        *current_arg_max_size += 30;
-        printf("current_arg_max_size: %d\n", *current_arg_max_size);
-        *current_arg = (char *) realloc(*current_arg, *current_arg_max_size);
-        if (*current_arg == NULL) {
-            perror("Error reallocating memory");
-            do_exit();
-        }
-    }
-    (*current_arg)[*current_arg_len] = c;
-    printf("Added new char '%c' to '%s' at pos %d\n", c, *current_arg, *current_arg_len);
-    *current_arg_len += 1;
-}
-
-void cpy_arg(char** current_arg, int* argc, char** argv) {
-    int current_arg_len = strlen(*current_arg);
-    char* new_arg = (char *) calloc(current_arg_len + 1, sizeof(char));
-    if (new_arg == NULL) {
-        perror("Couldn't allocate memory for copying arguments. 1");
-        do_exit();
-    }
-    if ((long) strncpy(new_arg, *current_arg, current_arg_len + 1) < 0) {
-        printf("Couldn't allocate memory for copying arguments. 2");
-        do_exit();
-    }
-    free(*current_arg);
-    *current_arg = (char *) calloc(30, sizeof(char));
-    if (*current_arg == NULL) {
-        perror("Couldn't allocate memory for copying arguments. 3");
-        do_exit();
-    }
-    argv[*argc] = new_arg;
-    *argc += 1;
-}
-
-
-
-
-
-
-
-
 char* get_arg(int* status, int* is_eof) {
     char* buffer = (char*) calloc(10, 1);
     char c;
@@ -457,7 +240,8 @@ char* get_arg(int* status, int* is_eof) {
         }
 
         if (count + 1 > bufsz) {
-            if (realloc(buffer, bufsz + 10) == NULL) {
+            buffer = realloc(buffer, bufsz + 10);
+            if (buffer == NULL) {
                 perror("Error resizing buffer for arg.");
                 do_exit();
             }
@@ -529,7 +313,8 @@ char** get_my_args(int* count, int* should_background, int* is_eof) {
 
         if (argc + 1 > argv_sz) {
             argv_sz += 10;
-            if (realloc(argv, argv_sz * sizeof(char*)) == NULL) {
+            argv = realloc(argv, argv_sz * sizeof(char*));
+            if (argv == NULL) {
                 mem_error();
             }
         }
@@ -563,5 +348,4 @@ void mem_error() {
     perror("Out of memory.\n");
     do_exit();
 }
-
 
