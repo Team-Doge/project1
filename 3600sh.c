@@ -44,14 +44,6 @@ int main(int argc, char*argv[]) {
         if (my_argv == NULL) {
             continue;
         }
-       // printf("Got %d args.\n", count);
-        if (should_background) {
-           // printf("Will background the process.\n");
-        }
-        for (int i = 0; i < count; i++) {
-//            printf("Got arg %d: '%s'\n", i, my_argv[i]);
-        }
-
         execute_cmd(count, my_argv, &should_background);
     }
     do_exit();
@@ -60,13 +52,18 @@ int main(int argc, char*argv[]) {
 }
 
 // Function which exits, printing the necessary message
-//
 void do_exit() {
     printf("So long and thanks for all the fish!\n");
     wait(NULL);
     exit(0);
 }
 
+/**
+  * Execute a command.
+  * @var argc The number of arguments
+  * @var argv The array of arguments
+  * @var should_background Whether or not to run it as a background process
+  */
 int execute_cmd(int argc, char** argv, int* should_background) {
     if (argv[0] && strcmp(argv[0], "exit") == 0) {
         do_exit();
@@ -75,7 +72,7 @@ int execute_cmd(int argc, char** argv, int* should_background) {
     pid_t pid  = fork();
 
     if (pid < 0) {
-        // Uh oh, an error
+        // Uh oh, an error with forking
         fprintf(stderr, "Fork Failed");
         return 1;
     } else if (pid == 0) { // Child process
@@ -87,11 +84,10 @@ int execute_cmd(int argc, char** argv, int* should_background) {
         // Checking for stdin/stdout redirection
         for (int i = 0; i < argc; i++) {
             char* arg = argv[i];
-            //printf("Checking redirection for: '%s'\n", arg);
             // redirection check
             if (is_redirection(arg)) {
                 char* next_arg = argv[i+1];
-                //printf("Redirection: '%s' followed by '%s'\n", arg, next_arg);
+
                 if (next_arg == NULL || is_redirection(next_arg) || strcmp(next_arg, "&") == 0) {
                     bad_syntax = 1;
                     break;
@@ -100,7 +96,6 @@ int execute_cmd(int argc, char** argv, int* should_background) {
                 if ((i + 2) < argc) {
                     char* next_next_arg = argv[i+2];
                     if (next_next_arg != NULL) {
-                        // printf("next_next_arg: '%s'\n", next_next_arg);
                         if (!is_redirection(next_next_arg) && strcmp(next_next_arg, "&") != 0) {
                             bad_syntax = 1;
                             break;
@@ -109,7 +104,6 @@ int execute_cmd(int argc, char** argv, int* should_background) {
                 }
 
                 if (strcmp(arg, ">") == 0) {
-              //      printf("Redirecting stdout to: '%s'\n", argv[i+1]);
                     stdout_fname = argv[i+1];
                 } else if (strcmp(arg, "<") == 0) {
                     stdin_fname = argv[i+1];
@@ -198,12 +192,19 @@ int execute_cmd(int argc, char** argv, int* should_background) {
     return 0;
 }
 
+// Is the given arg a redirection character
 int is_redirection(char* arg) {
     return strcmp(arg, ">") == 0
             || strcmp(arg, "<") == 0
             || strcmp(arg, "2>") == 0;
 }
 
+
+// Get a single argument, returning a status code and setting is_eof if the EOF char
+// was read
+
+// STATUS 1 = End of line, execute command
+// STATUS 2 = Background the process
 char* get_arg(int* status, int* is_eof) {
     char* buffer = (char*) calloc(10, 1);
     char c;
@@ -317,12 +318,14 @@ char* get_arg(int* status, int* is_eof) {
 }
 
 
-
+// Is the given char whitespace
 int is_white_space(char c) {
     return (c == ' ') || (c == '\t') || (c == '\n');
 }
 
 
+// Read through stdin until the end of line or EOF
+// and set EOF if the EOF was read
 void empty_input(int* is_eof) {
     char c;
     c = getchar();
@@ -335,9 +338,10 @@ void empty_input(int* is_eof) {
 }
 
 
-
-
-
+// Read in all arguments from stdin
+// Increment count with the number of args read
+// Set should_background to 1 if the argument array returned should be backgrounded
+// Set is_eof to 1 if the end of file was reached
 char** get_my_args(int* count, int* should_background, int* is_eof) {
     int argc = 0;
     int argv_sz = 10;
@@ -381,8 +385,6 @@ char** get_my_args(int* count, int* should_background, int* is_eof) {
 
         argv[argc] = arg;
         argc++;
-
-        //printf("Added arg '%s' with status %d\n", arg, status);
     }
 
     char** ret = (char**) calloc(argc + 1, sizeof(char*));
@@ -411,7 +413,7 @@ char** get_my_args(int* count, int* should_background, int* is_eof) {
     return ret;
 }
 
-
+// There was a memory error. Exit.
 void mem_error() {
     perror("Out of memory.\n");
     do_exit();
